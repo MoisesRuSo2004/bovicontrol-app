@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "BoviControl",
-    "slug": "bovicontrol-app",
+    "slug": "bovicontrolapp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icono.png",
@@ -42,14 +42,20 @@
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0,
-      "url": "https://u.expo.dev/bovicontrol-app"
+      "url": "https://u.expo.dev/5c19afb1-31f8-42e8-b194-dfdb0f5ba674"
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
+    "extra": {
+      "eas": {
+        "projectId": "5c19afb1-31f8-42e8-b194-dfdb0f5ba674"
+      }
+    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "owner": "moisesruso2004"
   }
 }

@@ -17,19 +17,17 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://bovicontrol-api.vercel.app/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://bovicontrol-backend.vercel.app/api/v1"
       }
     },
     "production": {
+      "channel": "production",
       "android": {
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://bovicontrol-api.vercel.app/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://bovicontrol-backend.vercel.app/api/v1"
       }
     }
-  },
-  "update": {
-    "channel": "production"
   }
 }
