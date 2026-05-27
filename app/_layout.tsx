@@ -1,8 +1,9 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import 'react-native-reanimated';
 import Toast from 'react-native-toast-message';
@@ -26,17 +27,41 @@ function AuthGate() {
   const { isAuthenticated, isLoading } = useAuthStore();
   const router = useRouter();
   const segments = useSegments();
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
+  /* 1. Check onboarding flag on mount */
   useEffect(() => {
-    if (isLoading) return;
+    AsyncStorage.getItem('onboarding_done').then((val) => {
+      setShowOnboarding(!val);
+      setOnboardingChecked(true);
+    });
+  }, []);
+
+  /* 2. Route once both checks are ready */
+  useEffect(() => {
+    if (isLoading || !onboardingChecked) return;
+
     SplashScreen.hideAsync();
-    const inAuthGroup = segments[0] === '(auth)';
-    if (!isAuthenticated && !inAuthGroup) {
-      router.replace('/(auth)/login');
-    } else if (isAuthenticated && inAuthGroup) {
-      router.replace('/(app)');
+
+    const seg0 = segments[0] as string;
+    const inOnboarding = seg0 === 'onboarding';
+    const inAuthGroup  = seg0 === '(auth)';
+
+    if (showOnboarding && !inOnboarding) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      router.replace('/onboarding' as any);
+      return;
     }
-  }, [isAuthenticated, isLoading, segments]);
+
+    if (!showOnboarding) {
+      if (!isAuthenticated && !inAuthGroup) {
+        router.replace('/(auth)/login');
+      } else if (isAuthenticated && (inAuthGroup || (seg0 === 'onboarding'))) {
+        router.replace('/(app)');
+      }
+    }
+  }, [isAuthenticated, isLoading, segments, onboardingChecked, showOnboarding]);
 
   return null;
 }
@@ -56,7 +81,6 @@ export default function RootLayout() {
         maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
         dehydrateOptions: {
           shouldDehydrateQuery: (query) =>
-            // Persist all successful queries except auth-sensitive ones
             query.state.status === 'success' &&
             !String(query.queryKey[0]).startsWith('auth'),
         },
@@ -66,14 +90,13 @@ export default function RootLayout() {
         <AuthGate />
         <OfflineSyncGate />
         <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(app)" />
         </Stack>
-        <StatusBar style="auto" />
+        <StatusBar style="light" />
         <Toast config={toastConfig} visibilityTime={3500} topOffset={54} />
-        {/* Offline indicator — floats at the top */}
         <OfflineBanner />
-        {/* OTA update banner — floats at the bottom */}
         <UpdateBanner />
       </View>
     </PersistQueryClientProvider>
