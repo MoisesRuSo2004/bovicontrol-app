@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { create } from 'zustand';
 import { api } from '../lib/api';
+import { queryClient } from '../lib/query-client';
 import { LoginRequest, LoginResponse, User } from '../types/auth.types';
 
 export interface RegisterWithFarmRequest {
@@ -25,6 +26,8 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  blockReason: string | null;        // mensaje cuando finca/suscripción bloquea acceso
+  setBlockReason: (reason: string | null) => void;
   login: (credentials: LoginRequest) => Promise<void>;
   register: (data: RegisterWithFarmRequest) => Promise<void>;
   logout: () => Promise<void>;
@@ -36,6 +39,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isAuthenticated: false,
   isLoading: true,
+  blockReason: null,
+  setBlockReason: (reason) => set({ blockReason: reason }),
 
   loadSession: async () => {
     try {
@@ -53,11 +58,19 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   login: async (credentials) => {
-    const { data } = await api.post<{ data: LoginResponse }>('/auth/login', credentials);
-    const { user, accessToken, refreshToken } = data.data;
-    await SecureStore.setItemAsync('accessToken', accessToken);
-    await SecureStore.setItemAsync('refreshToken', refreshToken);
-    set({ user, isAuthenticated: true });
+    try {
+      const { data } = await api.post<{ data: LoginResponse }>('/auth/login', credentials);
+      const { user, accessToken, refreshToken } = data.data;
+      await SecureStore.setItemAsync('accessToken', accessToken);
+      await SecureStore.setItemAsync('refreshToken', refreshToken);
+      set({ user, isAuthenticated: true, blockReason: null });
+    } catch (err: any) {
+      // Si el error es por suscripción/finca, guardar el motivo para mostrar la pantalla de bloqueo
+      const msg: string = err?.response?.data?.message ?? err?.message ?? '';
+      const isBlock = msg.includes('suscripción') || msg.includes('desactivada') || msg.includes('venció');
+      if (isBlock) set({ blockReason: msg });
+      throw err;
+    }
   },
 
   register: async (registerData) => {
@@ -77,6 +90,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     } finally {
       await SecureStore.deleteItemAsync('accessToken');
       await SecureStore.deleteItemAsync('refreshToken');
+      // Limpiar todo el cache para que el próximo usuario no vea datos del anterior
+      queryClient.clear();
       set({ user: null, isAuthenticated: false });
     }
   },

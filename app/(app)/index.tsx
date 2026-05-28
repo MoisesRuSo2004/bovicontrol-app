@@ -248,39 +248,47 @@ export default function DashboardScreen() {
   const insets   = useSafeAreaInsets();
 
 
-  /* queries */
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+  const farmId       = user?.farmId;
+
+  /* queries — todas scopeadas por farmId para evitar cache cruzado entre usuarios */
   const { data: stats } = useQuery({
-    queryKey: ['animals', 'stats'],
+    queryKey: ['animals', 'stats', farmId],
     queryFn: () => api.get('/animals/stats').then((r) => r.data.data),
+    enabled: !isSuperAdmin && !!farmId,
   });
 
   const { data: alerts } = useQuery({
-    queryKey: ['health', 'alerts', 'upcoming'],
+    queryKey: ['health', 'alerts', 'upcoming', farmId],
     queryFn: () => api.get('/health/alerts/upcoming?daysAhead=7').then((r) => r.data.data ?? []),
+    enabled: !isSuperAdmin && !!farmId,
   });
 
   const { data: farm } = useQuery({
-    queryKey: ['farm', user?.farmId],
-    queryFn: () => api.get(`/farms/${user?.farmId}`).then((r) => r.data.data),
-    enabled: !!user?.farmId,
+    queryKey: ['farm', farmId],
+    queryFn: () => api.get(`/farms/${farmId}`).then((r) => r.data.data),
+    enabled: !isSuperAdmin && !!farmId,
   });
 
   const { data: milkSummary } = useQuery<MilkSalesSummary>({
-    queryKey: ['milk-summary'],
+    queryKey: ['milk-summary', farmId],
     queryFn: () => api.get('/production/milk-sales/summary').then((r) => r.data.data ?? r.data),
+    enabled: !isSuperAdmin && !!farmId,
   });
 
   const { data: upcomingBirths } = useQuery({
-    queryKey: ['reproduction', 'upcoming', 30],
+    queryKey: ['reproduction', 'upcoming', 30, farmId],
     queryFn: () =>
       api.get('/reproduction/pregnancies/upcoming-births?daysAhead=30').then((r) => r.data.data ?? []),
+    enabled: !isSuperAdmin && !!farmId,
   });
 
   const { from: finFrom, to: finTo } = currentMonthRange();
   const { data: financeSummary } = useQuery<FinanceSummary>({
-    queryKey: ['finance', 'summary', finFrom, finTo],
+    queryKey: ['finance', 'summary', finFrom, finTo, farmId],
     queryFn: () =>
       api.get(`/finance/summary?from=${finFrom}&to=${finTo}`).then((r) => r.data.data),
+    enabled: !isSuperAdmin && !!farmId,
   });
 
   /* badge de alertas inteligentes (HIGH + MEDIUM del engine) */
@@ -306,7 +314,7 @@ export default function DashboardScreen() {
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
   })();
   const showSubscriptionBanner =
-    user?.role !== 'SUPER_ADMIN' &&
+    !isSuperAdmin &&
     subscriptionDaysLeft !== null &&
     subscriptionDaysLeft >= 0 &&
     subscriptionDaysLeft <= 7;
@@ -605,7 +613,34 @@ export default function DashboardScreen() {
             </View>
           </View>
 
+          {/* ── Banner Super Admin ───────────────────────────── */}
+          {isSuperAdmin && (
+            <Animated.View entering={FadeInDown.delay(100).duration(400)}>
+              <Pressable
+                onPress={() => router.push('/(app)/admin' as any)}
+                style={({ pressed }) => ({
+                  marginHorizontal: 22, marginTop: 20,
+                  backgroundColor: '#eef2ff',
+                  borderRadius: 16, padding: 16,
+                  flexDirection: 'row', alignItems: 'center', gap: 14,
+                  borderWidth: 1.5, borderColor: '#c7d2fe',
+                  opacity: pressed ? 0.85 : 1,
+                })}
+              >
+                <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#4f46e5', alignItems: 'center', justifyContent: 'center' }}>
+                  <MaterialCommunityIcons name="shield-check" size={22} color="#fff" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontWeight: '800', color: '#3730a3', fontSize: 14 }}>Panel de Administración</Text>
+                  <Text style={{ color: '#6366f1', fontSize: 12, marginTop: 2 }}>Gestionar fincas y clientes</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#6366f1" />
+              </Pressable>
+            </Animated.View>
+          )}
+
           {/* ── Registrar rápido ────────────────────────────── */}
+          {!isSuperAdmin && (
           <View style={{ paddingHorizontal: 22, marginTop: 28 }}>
             <Text style={{ fontSize: 14, fontWeight: '700', color: Colors.text, marginBottom: 14 }}>
               Registrar rápido
@@ -653,6 +688,7 @@ export default function DashboardScreen() {
               ))}
             </View>
           </View>
+          )}
 
         </View>
       </ScrollView>

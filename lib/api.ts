@@ -1,5 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import * as SecureStore from 'expo-secure-store';
+import { useAuthStore } from '../stores/auth.store';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1';
 
@@ -36,9 +37,22 @@ api.interceptors.response.use(
 
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return api(originalRequest);
-      } catch {
+      } catch (refreshError: any) {
         await SecureStore.deleteItemAsync('accessToken');
         await SecureStore.deleteItemAsync('refreshToken');
+
+        // Guardar el motivo del bloqueo si viene del backend
+        const msg: string =
+          refreshError?.response?.data?.message ??
+          refreshError?.message ??
+          '';
+        const isSubscriptionOrFarmBlock =
+          msg.includes('suscripción') ||
+          msg.includes('desactivada') ||
+          msg.includes('venció');
+        if (isSubscriptionOrFarmBlock) {
+          useAuthStore.getState().setBlockReason(msg);
+        }
       }
     }
     return Promise.reject(error);

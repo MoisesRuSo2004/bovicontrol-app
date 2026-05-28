@@ -1,5 +1,5 @@
-'use client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
@@ -28,41 +28,41 @@ const { width: SCREEN_W } = Dimensions.get('window');
 const SLIDES = [
   {
     id: '1',
-    bg: '#064E3B',          // emerald-900
-    accent: '#10B981',      // emerald-500
-    emoji: '🐄',
+    bg: '#064E3B',
+    accent: '#10B981',
+    icon: 'cow' as const,
     title: 'Bienvenido a\nBoviControl',
     body: 'La app que todo ganadero necesita para llevar su finca desde la palma de su mano.',
   },
   {
     id: '2',
     bg: '#1C3448',
-    accent: '#38BDF8',      // sky-400
-    emoji: '📋',
+    accent: '#38BDF8',
+    icon: 'clipboard-list-outline' as const,
     title: 'Gestiona\ntu hato',
     body: 'Registra todos tus animales, razas, categorías, genealogía y su historial completo.',
   },
   {
     id: '3',
     bg: '#1E3A5F',
-    accent: '#60A5FA',      // blue-400
-    emoji: '🥛',
+    accent: '#60A5FA',
+    icon: 'chart-areaspline' as const,
     title: 'Controla\ntu producción',
     body: 'Lleva el registro diario de leche, pesos y ventas. Genera reportes en segundos.',
   },
   {
     id: '4',
     bg: '#3B1F5E',
-    accent: '#A78BFA',      // violet-400
-    emoji: '💉',
+    accent: '#A78BFA',
+    icon: 'needle' as const,
     title: 'Sanidad\nal día',
     body: 'Vacunas, tratamientos y alertas inteligentes para que tu ganado esté siempre protegido.',
   },
   {
     id: '5',
-    bg: '#14532D',          // green-900
-    accent: '#4ADE80',      // green-400
-    emoji: '🚀',
+    bg: '#14532D',
+    accent: '#4ADE80',
+    icon: 'check-decagram-outline' as const,
     title: '¡Todo listo!\nComencemos',
     body: 'Crea tu cuenta o inicia sesión para empezar a gestionar tu finca ahora mismo.',
     isLast: true,
@@ -108,9 +108,9 @@ function SlideItem({ item }: { item: Slide }) {
       <View style={[styles.circleLg, { borderColor: item.accent + '22' }]} />
       <View style={[styles.circleSm, { borderColor: item.accent + '33' }]} />
 
-      {/* Illustration */}
-      <View style={[styles.emojiWrap, { backgroundColor: item.accent + '22', borderColor: item.accent + '44' }]}>
-        <Text style={styles.emoji}>{item.emoji}</Text>
+      {/* Icon illustration */}
+      <View style={[styles.iconWrap, { backgroundColor: item.accent + '1A', borderColor: item.accent + '44' }]}>
+        <MaterialCommunityIcons name={item.icon} size={80} color={item.accent} />
       </View>
 
       {/* Text */}
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
     left: -SCREEN_W * 0.3,
   },
 
-  emojiWrap: {
+  iconWrap: {
     width: 160,
     height: 160,
     borderRadius: 80,
@@ -282,7 +282,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 40,
   },
-  emoji: { fontSize: 72 },
 
   title: {
     fontSize: 36,

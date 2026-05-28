@@ -24,7 +24,7 @@ function OfflineSyncGate() {
 }
 
 function AuthGate() {
-  const { isAuthenticated, isLoading } = useAuthStore();
+  const { isAuthenticated, isLoading, blockReason } = useAuthStore();
   const router = useRouter();
   const segments = useSegments();
   const [onboardingChecked, setOnboardingChecked] = useState(false);
@@ -44,24 +44,33 @@ function AuthGate() {
 
     SplashScreen.hideAsync();
 
-    const seg0 = segments[0] as string;
+    const seg0     = segments[0] as string;
+    const seg1     = segments[1] as string | undefined;
     const inOnboarding = seg0 === 'onboarding';
     const inAuthGroup  = seg0 === '(auth)';
+    const inBlocked    = inAuthGroup && seg1 === 'blocked';
 
-    if (showOnboarding && !inOnboarding) {
+    // Si hay un motivo de bloqueo → pantalla de bloqueo
+    if (blockReason && !inBlocked) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      router.replace('/(auth)/blocked' as any);
+      return;
+    }
+
+    if (showOnboarding && !inOnboarding && !inAuthGroup) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       router.replace('/onboarding' as any);
       return;
     }
 
-    if (!showOnboarding) {
+    if (!showOnboarding || inAuthGroup) {
       if (!isAuthenticated && !inAuthGroup) {
         router.replace('/(auth)/login');
-      } else if (isAuthenticated && (inAuthGroup || (seg0 === 'onboarding'))) {
+      } else if (isAuthenticated && (inAuthGroup || inOnboarding)) {
         router.replace('/(app)');
       }
     }
-  }, [isAuthenticated, isLoading, segments, onboardingChecked, showOnboarding]);
+  }, [isAuthenticated, isLoading, segments, onboardingChecked, showOnboarding, blockReason]);
 
   return null;
 }
@@ -93,6 +102,7 @@ export default function RootLayout() {
           <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(app)" />
+          <Stack.Screen name="blocked" options={{ animation: 'fade' }} />
         </Stack>
         <StatusBar style="light" />
         <Toast config={toastConfig} visibilityTime={3500} topOffset={54} />

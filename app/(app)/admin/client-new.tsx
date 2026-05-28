@@ -2,53 +2,162 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
-  ActivityIndicator, Pressable, ScrollView,
+  ActivityIndicator, FlatList, Modal, Pressable, ScrollView,
   Text, TextInput, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { z } from 'zod';
 import { Colors } from '../../../constants/colors';
-import { api } from '../../../lib/api';
+import { api, getErrorMessage } from '../../../lib/api';
+
+// ─── Departamentos de Colombia ────────────────────────────────────────────────
+
+const DEPARTAMENTOS = [
+  'Amazonas', 'Antioquia', 'Arauca', 'Atlántico', 'Bolívar', 'Boyacá',
+  'Caldas', 'Caquetá', 'Casanare', 'Cauca', 'Cesar', 'Chocó', 'Córdoba',
+  'Cundinamarca', 'Guainía', 'Guaviare', 'Huila', 'La Guajira', 'Magdalena',
+  'Meta', 'Nariño', 'Norte de Santander', 'Putumayo', 'Quindío', 'Risaralda',
+  'San Andrés y Providencia', 'Santander', 'Sucre', 'Tolima',
+  'Valle del Cauca', 'Vaupés', 'Vichada',
+  'Bogotá D.C.',
+];
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
 const schema = z.object({
-  // Finca
-  farmName:       z.string().min(2, 'Nombre de finca requerido'),
-  farmLocation:   z.string().optional(),
-  farmDepartment: z.string().optional(),
-  farmPhone:      z.string().optional(),
-  farmEmail:      z.string().email('Email inválido').optional().or(z.literal('')),
-  farmNotes:      z.string().optional(),
-  // Usuario
-  firstName:      z.string().min(2, 'Nombre requerido'),
-  lastName:       z.string().min(2, 'Apellido requerido'),
-  username:       z.string().min(3, 'Mínimo 3 caracteres').regex(/^[a-z0-9._-]+$/, 'Solo letras, números, puntos, guiones').optional().or(z.literal('')),
-  email:          z.string().email('Email inválido'),
-  password:       z.string().min(6, 'Mínimo 6 caracteres'),
-  phone:          z.string().optional(),
-  // Suscripción
+  farmName:           z.string().min(2, 'Nombre de finca requerido'),
+  farmLocation:       z.string().optional(),
+  farmDepartment:     z.string().optional(),
+  farmPhone:          z.string().optional(),
+  farmEmail:          z.string().email('Email inválido').or(z.literal('')).optional(),
+  farmNotes:          z.string().optional(),
+  firstName:          z.string().min(2, 'Nombre requerido'),
+  lastName:           z.string().min(2, 'Apellido requerido'),
+  username:           z.string().min(3, 'Mínimo 3 caracteres').regex(/^[a-z0-9._-]+$/, 'Solo letras min., números, puntos y guiones').or(z.literal('')).optional(),
+  email:              z.string().email('Email inválido'),
+  password:           z.string().min(6, 'Mínimo 6 caracteres'),
+  phone:              z.string().optional(),
   subscriptionMonths: z.string().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
 
 const MONTHS_OPTIONS = [
-  { label: '1 mes',   value: '1'  },
-  { label: '3 meses', value: '3'  },
-  { label: '6 meses', value: '6'  },
-  { label: '1 año',   value: '12' },
-  { label: 'Sin límite', value: '0' },
+  { label: '1 mes',      value: '1'  },
+  { label: '3 meses',    value: '3'  },
+  { label: '6 meses',    value: '6'  },
+  { label: '1 año',      value: '12' },
+  { label: 'Sin límite', value: '0'  },
 ];
+
+// ─── Selector de departamento ─────────────────────────────────────────────────
+
+function DepartmentPicker({ value, onChange }: { value?: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const insets = useSafeAreaInsets();
+
+  const filtered = DEPARTAMENTOS.filter((d) =>
+    d.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  return (
+    <>
+      <Pressable
+        onPress={() => { setSearch(''); setOpen(true); }}
+        style={{
+          backgroundColor: Colors.gray[50], borderRadius: 10,
+          borderWidth: 1, borderColor: Colors.border,
+          paddingHorizontal: 14, paddingVertical: 12,
+          flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        }}
+      >
+        <Text style={{ fontSize: 14, color: value ? Colors.text : Colors.textMuted }}>
+          {value || 'Seleccionar departamento'}
+        </Text>
+        <Ionicons name="chevron-down" size={16} color={Colors.textMuted} />
+      </Pressable>
+
+      <Modal visible={open} animationType="slide" transparent>
+        <View style={{ flex: 1, backgroundColor: '#00000055', justifyContent: 'flex-end' }}>
+          <View style={{
+            backgroundColor: Colors.card,
+            borderTopLeftRadius: 24, borderTopRightRadius: 24,
+            paddingBottom: insets.bottom + 16,
+            maxHeight: '75%',
+          }}>
+            {/* Handle */}
+            <View style={{ alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, marginTop: 12, marginBottom: 16 }} />
+
+            <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+              <Text style={{ fontSize: 16, fontWeight: '800', color: Colors.text, marginBottom: 12 }}>
+                Seleccionar departamento
+              </Text>
+              {/* Buscador */}
+              <View style={{
+                flexDirection: 'row', alignItems: 'center', gap: 8,
+                backgroundColor: Colors.gray[50], borderRadius: 12,
+                borderWidth: 1, borderColor: Colors.border,
+                paddingHorizontal: 12, paddingVertical: 10,
+              }}>
+                <Ionicons name="search-outline" size={16} color={Colors.textMuted} />
+                <TextInput
+                  value={search}
+                  onChangeText={setSearch}
+                  placeholder="Buscar..."
+                  placeholderTextColor={Colors.textMuted}
+                  style={{ flex: 1, fontSize: 14, color: Colors.text }}
+                  autoCapitalize="none"
+                />
+              </View>
+            </View>
+
+            <FlatList
+              data={filtered}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => {
+                const selected = item === value;
+                return (
+                  <Pressable
+                    onPress={() => { onChange(item); setOpen(false); }}
+                    style={({ pressed }) => ({
+                      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                      paddingHorizontal: 20, paddingVertical: 14,
+                      backgroundColor: selected ? Colors.primary + '12' : (pressed ? Colors.gray[50] : 'transparent'),
+                      borderBottomWidth: 0.5, borderBottomColor: Colors.border,
+                    })}
+                  >
+                    <Text style={{ fontSize: 15, color: selected ? Colors.primary : Colors.text, fontWeight: selected ? '700' : '400' }}>
+                      {item}
+                    </Text>
+                    {selected && <Ionicons name="checkmark" size={18} color={Colors.primary} />}
+                  </Pressable>
+                );
+              }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            />
+
+            <Pressable
+              onPress={() => setOpen(false)}
+              style={{ marginHorizontal: 16, marginTop: 12, paddingVertical: 14, borderRadius: 14, backgroundColor: Colors.gray[100], alignItems: 'center' }}
+            >
+              <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.textMuted }}>Cancelar</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
+}
 
 // ─── Field component ──────────────────────────────────────────────────────────
 
-function Field({
-  label, error, children, required,
-}: {
+function Field({ label, error, children, required }: {
   label: string; error?: string; children: React.ReactNode; required?: boolean;
 }) {
   return (
@@ -62,9 +171,7 @@ function Field({
   );
 }
 
-function Input({
-  value, onChange, placeholder, secureTextEntry, keyboardType, autoCapitalize, autoCorrect,
-}: {
+function Input({ value, onChange, placeholder, secureTextEntry, keyboardType, autoCapitalize, autoCorrect }: {
   value: string; onChange: (v: string) => void; placeholder?: string;
   secureTextEntry?: boolean; keyboardType?: any; autoCapitalize?: any; autoCorrect?: boolean;
 }) {
@@ -105,32 +212,44 @@ export default function ClientNewScreen() {
   const mutation = useMutation({
     mutationFn: (data: FormData) => {
       const months = data.subscriptionMonths ? +data.subscriptionMonths : undefined;
-      return api.post('/admin/clients', {
-        ...data,
-        farmEmail:          data.farmEmail  || undefined,
-        username:           data.username   || undefined,
-        subscriptionMonths: months === 0 ? null : months,
-      });
+      const payload = {
+        farmName:           data.farmName,
+        farmLocation:       data.farmLocation?.trim()   || undefined,
+        farmDepartment:     data.farmDepartment?.trim() || undefined,
+        farmPhone:          data.farmPhone?.trim()      || undefined,
+        farmEmail:          data.farmEmail?.trim()      || undefined,
+        farmNotes:          data.farmNotes?.trim()      || undefined,
+        firstName:          data.firstName,
+        lastName:           data.lastName,
+        email:              data.email,
+        username:           data.username?.trim()       || undefined,
+        password:           data.password,
+        phone:              data.phone?.trim()          || undefined,
+        subscriptionMonths: months && months > 0 ? months : undefined,
+      };
+      console.log('[client-new] payload →', JSON.stringify(payload, null, 2));
+      return api.post('/admin/clients', payload);
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
+      console.log('[client-new] success →', JSON.stringify(res.data));
       queryClient.invalidateQueries({ queryKey: ['admin-farms'] });
       queryClient.invalidateQueries({ queryKey: ['admin-stats'] });
       Toast.show({ type: 'success', text1: 'Cliente creado', text2: 'Finca y usuario configurados correctamente' });
       router.back();
     },
-    onError: (e: any) => {
-      const msg = e?.response?.data?.message ?? 'Error al crear el cliente';
-      Toast.show({ type: 'error', text1: 'Error', text2: msg });
+    onError: (e: unknown) => {
+      const axErr = e as any;
+      console.error('[client-new] error status →', axErr?.response?.status);
+      console.error('[client-new] error data  →', JSON.stringify(axErr?.response?.data));
+      const msg = getErrorMessage(e);
+      Toast.show({ type: 'error', text1: 'Error al crear cliente', text2: msg, visibilityTime: 6000 });
     },
   });
 
   return (
     <View style={{ flex: 1, backgroundColor: Colors.background }}>
       {/* Header */}
-      <View style={{
-        backgroundColor: '#1e293b', paddingTop: insets.top + 10,
-        paddingBottom: 20, paddingHorizontal: 20,
-      }}>
+      <View style={{ backgroundColor: '#1e293b', paddingTop: insets.top + 10, paddingBottom: 20, paddingHorizontal: 20 }}>
         <View style={{ alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: '#ffffff30', marginBottom: 16 }} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: '#ffffff18', alignItems: 'center', justifyContent: 'center' }}>
@@ -154,6 +273,7 @@ export default function ClientNewScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+
         {/* ── Datos de la finca ── */}
         <View style={{ backgroundColor: Colors.card, borderRadius: 16, borderWidth: 1, borderColor: Colors.border, padding: 16, marginBottom: 16 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
@@ -166,16 +286,21 @@ export default function ClientNewScreen() {
               <Input value={value ?? ''} onChange={onChange} placeholder="Ej: Finca El Paraíso" />
             </Field>
           )} />
+
+          {/* Departamento — selector */}
           <Controller name="farmDepartment" control={control} render={({ field: { value, onChange } }) => (
             <Field label="Departamento" error={errors.farmDepartment?.message}>
-              <Input value={value ?? ''} onChange={onChange} placeholder="Ej: Antioquia" />
+              <DepartmentPicker value={value} onChange={onChange} />
             </Field>
           )} />
+
+          {/* Municipio — texto libre */}
           <Controller name="farmLocation" control={control} render={({ field: { value, onChange } }) => (
-            <Field label="Municipio / Ubicación" error={errors.farmLocation?.message}>
-              <Input value={value ?? ''} onChange={onChange} placeholder="Ej: El Carmen de Viboral" />
+            <Field label="Municipio / Vereda" error={errors.farmLocation?.message}>
+              <Input value={value ?? ''} onChange={onChange} placeholder="Ej: El Banco, vereda La Palma" />
             </Field>
           )} />
+
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <View style={{ flex: 1 }}>
               <Controller name="farmPhone" control={control} render={({ field: { value, onChange } }) => (
@@ -192,8 +317,9 @@ export default function ClientNewScreen() {
               )} />
             </View>
           </View>
+
           <Controller name="farmNotes" control={control} render={({ field: { value, onChange } }) => (
-            <Field label="Notas internas (solo tú las ves)" error={errors.farmNotes?.message}>
+            <Field label="Notas internas" error={errors.farmNotes?.message}>
               <TextInput
                 value={value ?? ''} onChangeText={onChange}
                 placeholder="Ej: Pagó por transferencia, referido por..."
@@ -227,26 +353,28 @@ export default function ClientNewScreen() {
               )} />
             </View>
           </View>
+
           <Controller name="username" control={control} render={({ field: { value, onChange } }) => (
             <Field label="Usuario corto (para iniciar sesión)" error={errors.username?.message}>
-              <View style={{ position: 'relative' }}>
-                <Input value={value ?? ''} onChange={(v) => onChange(v.toLowerCase().replace(/\s/g, ''))} placeholder="ej: juan.perez" autoCapitalize="none" autoCorrect={false} />
-              </View>
+              <Input value={value ?? ''} onChange={(v) => onChange(v.toLowerCase().replace(/\s/g, ''))} placeholder="ej: juan.perez" autoCapitalize="none" autoCorrect={false} />
               <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 4 }}>
-                Solo letras, números, puntos y guiones. Sin espacios.
+                Solo letras minúsculas, números, puntos y guiones.
               </Text>
             </Field>
           )} />
+
           <Controller name="email" control={control} render={({ field: { value, onChange } }) => (
             <Field label="Email" error={errors.email?.message} required>
               <Input value={value ?? ''} onChange={onChange} placeholder="cliente@email.com" keyboardType="email-address" autoCapitalize="none" />
             </Field>
           )} />
+
           <Controller name="password" control={control} render={({ field: { value, onChange } }) => (
             <Field label="Contraseña temporal" error={errors.password?.message} required>
               <Input value={value ?? ''} onChange={onChange} placeholder="Mínimo 6 caracteres" secureTextEntry />
             </Field>
           )} />
+
           <Controller name="phone" control={control} render={({ field: { value, onChange } }) => (
             <Field label="Teléfono del cliente" error={errors.phone?.message}>
               <Input value={value ?? ''} onChange={onChange} placeholder="3001234567" keyboardType="phone-pad" autoCapitalize="none" />
@@ -285,12 +413,19 @@ export default function ClientNewScreen() {
             La suscripción empieza desde hoy. Puedes extenderla después desde el detalle de la finca.
           </Text>
         </View>
+
       </ScrollView>
 
       {/* ── Botón crear ── */}
       <View style={{ position: 'absolute', bottom: insets.bottom + 16, left: 16, right: 16 }}>
         <Pressable
-          onPress={handleSubmit((d) => mutation.mutate(d))}
+          onPress={handleSubmit(
+            (d) => mutation.mutate(d),
+            (validationErrors) => {
+              console.error('[client-new] validation errors →', JSON.stringify(validationErrors, null, 2));
+              Toast.show({ type: 'error', text1: 'Revisa el formulario', text2: 'Hay campos con error', visibilityTime: 4000 });
+            },
+          )}
           disabled={mutation.isPending}
           style={({ pressed }) => ({
             backgroundColor: pressed ? '#16a34a' : Colors.primary,
